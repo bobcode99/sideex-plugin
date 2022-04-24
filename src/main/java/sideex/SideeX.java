@@ -1,20 +1,6 @@
 package sideex;
 
-import java.io.File;
-import java.io.FileFilter;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.URL;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.attribute.FileAttribute;
-import java.nio.file.attribute.PosixFilePermission;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -23,9 +9,9 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.commons.lang.StringUtils;
+import org.apache.tools.ant.types.resources.selectors.InstanceOf;
 import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.QueryParameter;
 
@@ -40,9 +26,7 @@ import hudson.model.Run;
 import hudson.model.TaskListener;
 import hudson.tasks.BuildStepDescriptor;
 import hudson.tasks.Builder;
-import hudson.util.DirScanner;
 import hudson.util.FormValidation;
-import hudson.util.io.ArchiverFactory;
 import jenkins.model.Jenkins;
 import jenkins.tasks.SimpleBuildStep;
 import net.sf.json.JSONArray;
@@ -55,8 +39,8 @@ public class SideeX extends Builder implements SimpleBuildStep {
 	private String stateTime;
 	private String testCaseFilePath;
 	private String reportURL;
-	
-	
+
+
 	@DataBoundConstructor
 	public SideeX(BuildDropDownList protocolMenu, String stateTime, String testCaseFilePath) {
 		this.protocolMenu =  protocolMenu;
@@ -73,7 +57,7 @@ public class SideeX extends Builder implements SimpleBuildStep {
 
 		@Override
 		public String getDisplayName() {
-			return "Execute SideeX Web Testing";
+			return "Execute SideeX Web Testing haha";
 		}
 
 		public List<BuildDropDownListDescriptor> getProtocolMenu() {
@@ -89,7 +73,7 @@ public class SideeX extends Builder implements SimpleBuildStep {
 
 			return supportedStrategies;
 		}
-		
+
 		public FormValidation doCheckStateTime(@QueryParameter String stateTime) {
 			try {
 				Long.valueOf(stateTime);
@@ -98,7 +82,7 @@ public class SideeX extends Builder implements SimpleBuildStep {
 				return FormValidation.error("Please enter a periodically time");
 			}
 		}
-		
+
 		public FormValidation doCheckTestCaseFilePath(@QueryParameter String testCaseFilePath) {
 			try {
 				if(StringUtils.trim(testCaseFilePath).equals("")) {
@@ -117,9 +101,9 @@ public class SideeX extends Builder implements SimpleBuildStep {
 			throws InterruptedException, IOException {
 		this.reportURL = "";
 		SideeXWebServiceClientAPI wsClient = null;
-		
+
 		build.addAction(new SideeXBuildAction(this));
-		
+
 		// Dropdown menu
 		if (protocolMenu instanceof HTTPItem) {
 			HTTPItem httpItem = (HTTPItem) protocolMenu;
@@ -142,10 +126,10 @@ public class SideeX extends Builder implements SimpleBuildStep {
 				build.setResult(Result.FAILURE);
 			}
 		}
-		
-		if(wsClient == null) 
+
+		if(wsClient == null)
 			return;
-		
+
 		FilePath testCaseFilePath = workspace.child(getTestCaseFilePath());
 		String tokenResponse = "", token = "", stateResponse = "", state = "", logUrl = "";
 		boolean running = true, passed, first = true, isTestCaseFolder = false;
@@ -158,19 +142,19 @@ public class SideeX extends Builder implements SimpleBuildStep {
 			FilePath tempDir = workspace.child(workspace.getRemote());
 			tempDir = tempDir.createTempDir(testCaseFilePath.getName(), null);
 			testCaseFilePath.copyRecursiveTo(tempDir);
-			
+
 			FilePath tempZip = workspace.child(tempDir.getName()+".zip");
-		    tempDir.zip(tempZip);
-		    testCaseFilePath = tempZip;
+			tempDir.zip(tempZip);
+			testCaseFilePath = tempZip;
 			isTestCaseFolder = true;
 		}
-		
+
 		fileParams.put(testCaseFilePath.getName(), testCaseFilePath);
 		try {
 			tokenResponse = JSONObject.fromObject(wsClient.runTestSuite(fileParams)).getString("token");
 		} catch (IOException e) {
-			listener.error("SideeX WebService Plugin cannot connect to your server, " + 
-							"please check SideeXWebServicePlugin's settings and the state of your server");
+			listener.error("SideeX WebService Plugin cannot connect to your server, " +
+					"please check SideeXWebServicePlugin's settings and the state of your server");
 			listener.error(e.getMessage());
 			throw e;
 		}
@@ -182,14 +166,14 @@ public class SideeX extends Builder implements SimpleBuildStep {
 				try {
 					stateResponse = wsClient.getState(tokenResponse);
 				} catch (IOException e) {
-					listener.error("SideeX WebService Plugin cannot connect to your server, "+ 
-								"please check SideeXWebServicePlugin's base URL settings and the state of your server");
+					listener.error("SideeX WebService Plugin cannot connect to your server, "+
+							"please check SideeXWebServicePlugin's base URL settings and the state of your server");
 					throw e;
 				}
 				state = JSONObject.fromObject(stateResponse).getJSONObject("webservice").getString("state");
 				if (first && !state.equals("complete")) {
 					listener.getLogger().println("SideeX WebSerivce state is " + state);
-					first = false; 	
+					first = false;
 				}
 
 				if (state.equals("complete")) {
@@ -202,9 +186,22 @@ public class SideeX extends Builder implements SimpleBuildStep {
 					this.parseError(JSONObject.fromObject(stateResponse).getJSONObject("webservice"), listener);
 					listener.getLogger().println("The test report can be downloaded at " + this.reportURL + ".");
 
-					for (int i = 0; i < summary.size(); i++) {
-						listener.getLogger().println(getSummarryFormat(JSONObject.fromObject(summary.get(i)), 60));
+					boolean isJSONArray = summary.get(0).getClass().equals(JSONArray.class);
+
+					if(isJSONArray) {
+						JSONArray tmpSummaryArr;
+						for (int i = 0; i < summary.size(); i++) {
+							tmpSummaryArr = (JSONArray) summary.get(i);
+							for(int j = 0; j < tmpSummaryArr.size(); j++){
+								listener.getLogger().println(getSummarryFormat(JSONObject.fromObject(tmpSummaryArr.get(j)), 60));
+							}
+						}
+					} else {
+						for (int i = 0; i < summary.size(); i++) {
+							listener.getLogger().println(getSummarryFormat(JSONObject.fromObject(summary.get(i)), 60));
+						}
 					}
+
 					if (passed == false) {
 						listener.error("Test Case Failed");
 						build.setResult(Result.FAILURE);
@@ -228,7 +225,7 @@ public class SideeX extends Builder implements SimpleBuildStep {
 			}
 		}
 	}
-	
+
 	@Override
 	public Collection<? extends Action> getProjectActions(AbstractProject<?, ?> project) {
 		List<Action> actions = new ArrayList<>();
@@ -248,25 +245,25 @@ public class SideeX extends Builder implements SimpleBuildStep {
 	void showRunnerLog(String type, String str, TaskListener listener) {
 		String output = "";
 		switch (type) {
-		case "info":
-			output = "[INFO] " + str;
-			break;
-		case "warn":
-			output = "[WARN] " + str;
-			break;
-		case "error":
-			output = "[ERROR] " + str;
-			break;
-		case "debug":
-			output = "[DEBUG] " + str;
-			break;
-		default:
-			output = "[INFO] " + str;
-			break;
+			case "info":
+				output = "[INFO] " + str;
+				break;
+			case "warn":
+				output = "[WARN] " + str;
+				break;
+			case "error":
+				output = "[ERROR] " + str;
+				break;
+			case "debug":
+				output = "[DEBUG] " + str;
+				break;
+			default:
+				output = "[INFO] " + str;
+				break;
 		}
 		listener.getLogger().println(output);
 	}
-	
+
 	public BuildDropDownList getProtocolMenu() {
 		return protocolMenu;
 	}
@@ -274,7 +271,7 @@ public class SideeX extends Builder implements SimpleBuildStep {
 	public String getTestCaseFilePath() {
 		return testCaseFilePath;
 	}
-	
+
 
 	public String getStateTime() {
 		return stateTime;
@@ -350,7 +347,7 @@ public class SideeX extends Builder implements SimpleBuildStep {
 	}
 
 	public Block listToBlock(Board board, List<List<String>> rowsList, List<List<Integer>> colWidthLength,
-			String header, List<Integer> headerWidthLength) {
+							 String header, List<Integer> headerWidthLength) {
 		List<Block> block = new ArrayList<>();
 
 		for (int i = 0; i < rowsList.size(); i++) {
