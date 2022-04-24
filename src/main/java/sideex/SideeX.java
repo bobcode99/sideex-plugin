@@ -57,7 +57,7 @@ public class SideeX extends Builder implements SimpleBuildStep {
 
 		@Override
 		public String getDisplayName() {
-			return "Execute SideeX Web Testing haha";
+			return "Execute SideeX Web Testing";
 		}
 
 		public List<BuildDropDownListDescriptor> getProtocolMenu() {
